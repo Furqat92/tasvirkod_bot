@@ -1,0 +1,293 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <title>GyverBraid Knitter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="favicon.svg">
+    <link href="https://use.fontawesome.com/releases/v6.3.0/css/all.css" rel="stylesheet">
+
+    <!-- Yandex.Metrika counter -->
+    <script type="text/javascript">
+        (function (m, e, t, r, i, k, a) {
+            m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments) };
+            m[i].l = 1 * new Date();
+            for (var j = 0; j < document.scripts.length; j++) { if (document.scripts[j].src === r) { return; } }
+            k = e.createElement(t), a = e.getElementsByTagName(t)[0], k.async = 1, k.src = r, a.parentNode.insertBefore(k, a)
+        })
+            (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+
+        ym(92861520, "init", {
+            clickmap: true,
+            trackLinks: true,
+            accurateTrackBounce: true
+        });
+    </script>
+    <noscript>
+        <div><img src="https://mc.yandex.ru/watch/92861520" style="position:absolute; left:-9999px;" alt="" /></div>
+    </noscript>
+    <!-- /Yandex.Metrika counter -->
+</head>
+
+<body>
+    <style>
+        body {
+            -moz-user-select: none;
+            -khtml-user-select: none;
+            user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .cont {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .inp {
+            font-size: 25px;
+            margin: 0px 10px;
+            height: 100%;
+            align-items: center;
+            display: flex;
+            justify-content: center;
+            border-radius: 5px;
+            padding: 0px;
+            min-width: 100px;
+        }
+
+        .text {
+            min-width: 100px;
+        }
+
+        .ctrl_row {
+            margin: 3px 10px;
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 40px;
+        }
+
+        .gray_row {
+            display: flex;
+            background: gray;
+            width: 100%;
+            justify-content: center;
+            padding: 10px 0px;
+            flex-direction: column;
+            align-items: center;
+            position: absolute;
+            bottom: 0;
+        }
+    </style>
+
+    <div class="cont">
+
+        <div class="ctrl_row">
+            <input type="range" id="size_range" style="width:100%" min="300" max="1000" value="600"
+                oninput="cv.width=this.value;cv.height=this.value;load();">
+        </div>
+
+        <canvas onclick="next()" id="canvas" width="600" height="600"></canvas>
+
+        <div class="gray_row">
+            <div class="ctrl_row">
+                <input type="number" class="inp text" id="current">
+                <label class="inp" id="percent">0</label>
+                <button class="inp" onclick="setCurrent();next()">SET</button>
+            </div>
+            <div class="ctrl_row">
+                <button class="inp" id="auto_start">▶</button>
+                <button class="inp" id="auto_stop">◼️️</button>
+            </div>
+            <div class="ctrl_row">
+                <input type="range" id="prd_range" style="width:90%" min="1" max="9" value="4"
+                    oninput="range_lbl.innerHTML=this.value" onchange="if(timer){stopTmr();startTmr();}">
+                <label style="font-size:25px;margin-left:10px" id="range_lbl">4</label>
+            </div>
+            <div class="ctrl_row">
+                <input class="inp text" type="text" id="linedata" style="width:300px">
+                <button class="inp" onclick="load()">LOAD</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+
+        let scale = 1.0;
+        let lines;
+        let amount = 0;
+        let start = false;
+        let cur = 0;
+        let cv = document.getElementById("canvas");
+        let cx = cv.getContext("2d");
+        let W2 = cv.width / 2;
+        let R = W2 - 30;
+        let s = document.location.toString();
+        let timer = null;
+
+        s = s.slice(s.indexOf('?') + 1);
+        linedata.value = s;
+
+        load();
+
+        document.getElementById("auto_start").addEventListener("click", startTmr);
+        document.getElementById("auto_stop").addEventListener("click", stopTmr);
+
+        if (localStorage.getItem(linedata.value) !== null) setCurrent(Number(localStorage.getItem(linedata.value)))
+        next();
+        function startTmr() {
+            if (!timer) timer = setInterval(next, prd_range.value * 1000);
+        }
+        function stopTmr() {
+            if (timer) clearInterval(timer);
+            timer = null;
+        }
+
+        document.addEventListener('keypress', (event) => {
+            if (event.code == 'Space') next();
+        }, false);
+
+
+
+        function setCurrent(value = null) {
+            let val;
+            if (value !== null) val = value;
+            else val = Number(current.value);
+            console.log(val);
+            if (val < 0) val = 0;
+            if (val > lines.length - 1) val = lines.length - 1;
+            cur = val;
+        }
+        function load() {
+            scale = cv.width / 600;
+            W2 = cv.width / 2;
+            R = W2 - 30;
+            cur = 0;
+            try {
+                lines = atob(linedata.value).split('').map(function (v) { return v.codePointAt(0) });
+            } catch (e) {
+                return;
+            }
+            amount = lines.pop();
+            start = false;
+
+            cx.clearRect(0, 0, cv.width, cv.height);
+            cx.textAlign = "center";
+            cx.textBaseline = "middle";
+
+            drawDots();
+
+            cx.lineWidth = 1;
+            cx.strokeStyle = "#0005";
+            for (let i = 1; i < lines.length; i++) drawLine(i);
+            cx.strokeStyle = "#000";
+
+            cx.font = "80px Arial";
+            cx.beginPath();
+            cx.fillStyle = "#fff";
+            cx.fillText("START", W2, W2);
+        }
+        function drawNums() {
+            cx.font = "12px Arial";
+            cx.beginPath();
+            cx.fillStyle = "#000";
+            for (let i = 0; i < amount; i++) {
+                let xy = getXYraw(i, R + 10);
+                cx.fillText(i, xy.x, xy.y);
+            }
+        }
+        function drawLine(node) {
+            cx.lineWidth = 1;
+            cx.strokeStyle = "#000";
+            let xy0 = getXY(node - 1);
+            let xy1 = getXY(node);
+            cx.beginPath();
+            cx.moveTo(xy0.x, xy0.y);
+            cx.lineTo(xy1.x, xy1.y);
+            cx.stroke();
+        }
+        function drawDots() {
+            cx.fillStyle = "#000";
+            for (let i = 0; i < amount; i++) {
+                let xy = getXYraw(i, R);
+                cx.beginPath();
+                cx.arc(xy.x, xy.y, 2, 0, 2 * Math.PI);
+                cx.fill();
+            }
+        }
+        function getXY(node, r = R) {
+            let x = W2 + r * Math.cos(2 * Math.PI * lines[node] / amount);
+            let y = W2 + r * Math.sin(2 * Math.PI * lines[node] / amount);
+            return { x, y };
+        }
+        function getXYraw(i, r) {
+            let x = W2 + r * Math.cos(2 * Math.PI * i / amount);
+            let y = W2 + r * Math.sin(2 * Math.PI * i / amount);
+            return { x, y };
+        }
+        function test() {
+            for (let i = 1; i < lines.length; i++) drawLine(i);
+        }
+        function arrow(node, state) {
+            if (cur < 0) return;
+            cx.beginPath();
+            cx.lineWidth = state ? 5 : 7;
+            cx.strokeStyle = state ? "#000" : "#FFF";
+            let xy0 = getXY(node, R + 10 + (state ? 0 : -2));
+            let xy1 = getXY(node, R + 30 + (state ? 0 : 2));
+            cx.moveTo(xy0.x, xy0.y);
+            cx.lineTo(xy1.x, xy1.y);
+            cx.stroke();
+        }
+        function next() {
+            if (cur > lines.length - 1) return;
+            if (!start) {
+                cx.clearRect(0, 0, cv.width, cv.height);
+                //drawNums();
+                drawDots();
+                start = true;
+            }
+            arrow(cur - 1, false);
+            arrow(cur, true);
+
+            cx.beginPath();
+            cx.arc(W2, W2, R - 2, 0, 2 * Math.PI);
+            cx.fillStyle = "#ffffffaa";
+            cx.fill();
+
+            cx.beginPath();
+            cx.rect(W2 - 90 * scale, W2 - 55 * scale, 180 * scale, 100 * scale);
+            cx.rect(W2 - 60 * scale, W2 - 150 * scale, 120 * scale, 80 * scale);
+            cx.rect(W2 - 60 * scale, W2 + 60 * scale, 120 * scale, 80 * scale);
+            cx.fillStyle = "#ffffff";
+            cx.fill();
+
+            cx.beginPath();
+            cx.rect(W2 - 100 * scale, W2 - 55 * scale, 200 * scale, 100 * scale);
+            cx.strokeStyle = "#000";
+            cx.stroke();
+
+            cx.font = 100 * scale + "px Arial";
+            cx.beginPath();
+            cx.fillStyle = "#000";
+            cx.fillText(lines[cur], W2, W2);
+            cx.font = 70 * scale + "px Arial";
+            cx.fillStyle = "#aaa";
+            cx.fillText((cur > 0) ? lines[cur - 1] : '', W2, W2 + 100 * scale);
+            cx.fillText(lines[cur + 1], W2, W2 - 100 * scale);
+
+            drawLine(cur, R - 2);
+            current.value = cur;
+            percent.innerHTML = Math.round(cur / lines.length * 100) + '%';
+            localStorage.setItem(linedata.value, cur);
+            cur++;
+        }
+    </script>
+
+</body>
+
+</html>
